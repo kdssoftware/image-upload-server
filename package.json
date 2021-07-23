@@ -1,0 +1,13 @@
+{
+  "name": "picturehouse-images",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:snakehead007/picturehouse-images.git",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "multer": "^1.4.2",
+    "uuid": "^8.3.2"
+  }
+}
