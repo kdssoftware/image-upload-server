@@ -47,9 +47,12 @@ app.post('/',async (req,res)=>{
 });
 
 app.get('/:filename',(req,res)=>{
-    
-    console.log(path.resolve(__dirname,'images/',escapeHtml(req.params.filename)));
-    res.sendFile(path.resolve(__dirname,'images/',escapeHtml(req.params.filename)));
+    try{
+        let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
+        res.sendFile(file);
+    }catch(e){
+        res.status(404).send("Not");
+    }
 });
 
 app.listen(4000,()=>{
