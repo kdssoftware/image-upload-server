@@ -48,7 +48,7 @@ app.post('/',async (req,res)=>{
 
 app.get('/:filename',(req,res)=>{
     
-    console.log(path.resolve(__dirname,'images/',(escapeHtmlreq.params.filename)));
+    console.log(path.resolve(__dirname,'images/',escapeHtml(req.params.filename)));
     res.sendFile(path.resolve(__dirname,'images/',escapeHtml(req.params.filename)));
 });
 
