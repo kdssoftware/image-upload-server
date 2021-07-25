@@ -51,7 +51,8 @@ app.get('/:filename',(req,res)=>{
         let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
         res.sendFile(file);
     }catch(e){
-        res.status(404).send("Not");
+        res.status(404).send();
+        res.end();
     }
 });
 
