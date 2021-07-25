@@ -11,6 +11,7 @@
     "uuid": "^8.3.2"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "windocker":"docker build -t ghcr.io/snakehead007/picturehouse-images . && docker push ghcr.io/snakehead007/picturehouse-images"
   }
 }

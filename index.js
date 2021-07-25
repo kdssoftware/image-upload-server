@@ -51,6 +51,6 @@ app.get('/:filename',(req,res)=>{
     res.sendFile(path.resolve(__dirname,'images/',req.params.filename));
 });
 
-app.listen(process.env.PORT,()=>{
-    console.log(`Server running on port ${process.env.PORT}`);
+app.listen(4000,()=>{
+    console.log(`Server running on port 4000`);
 })
