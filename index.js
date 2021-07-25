@@ -49,10 +49,19 @@ app.post('/',async (req,res)=>{
 app.get('/:filename',(req,res)=>{
     try{
         let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
+        //check if file exists
+        if(!fs.existsSync(file)){
+            res.status(404).send('File not found');
+            res.end();
+            return;
+        }
         res.sendFile(file);
-    }catch(e){
-        res.status(404).send();
         res.end();
+        return;
+    }catch(e){
+        res.status(500).send("Something went wrong on our end");
+        res.end();
+        return
     }
 });
 
