@@ -55,9 +55,8 @@ app.get('/:filename',(req,res)=>{
             res.end();
             return;
         }
-        res.sendFile(file);
-        res.end();
-        return;
+        res.sendFile(path.resolve(__dirname,'images/',escapeHtml(req.params.filename)));
+        
     }catch(e){
         res.status(500).send("Something went wrong on our end");
         res.end();
