@@ -5,6 +5,9 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
+
+app.use(cors({origin:'*'}));
 
 const upload = multer();
 
@@ -26,24 +29,19 @@ const multerAny = initMiddleware(
 
 app.post('/',async (req,res)=>{
     await multerAny(req, res);
-   if(!req?.files?.length){
-        res.status(400).send('No file was uploaded');
-        res.end();
-        return;
-   }else{
-        const blobs = req.files;
-        const uuid = uuidv4();
-        const imagesData= blobs.map((blob)=>{
-            console.log(blob);
-            const imagePathPrivate = path.resolve(__dirname, "images",uuid+"."+blob.mimetype.split('/')[1]);
-            const imagePathPublic = `${process.env.HOST}/${uuid+"."+blob.mimetype.split('/')[1]}`;
-            console.log(imagePathPrivate,imagePathPublic);
-            fs.writeFileSync(imagePathPrivate, blob.buffer);
-            res.status(201).send(imagePathPublic);
-            res.end();
-            return;
-          });
-   }
+    const blobs = req.files;
+    let urls = [];
+    for await (const blob of blobs) {
+        const uuid = uuidv4();  
+        const imagePathPrivate = path.resolve(__dirname, "images",uuid+"."+blob.mimetype.split('/')[1]);
+        const imagePathPublic = `${process.env.HOST}/${uuid+"."+blob.mimetype.split('/')[1]}`;
+        fs.writeFileSync(imagePathPrivate, blob.buffer);
+        urls.push(imagePathPublic);
+        console.log(`new file added: ${imagePathPublic}`);
+    }
+    res.status(201).send(urls);
+    res.end();
+    return;
 });
 
 app.get('/:filename',(req,res)=>{
@@ -86,3 +84,5 @@ function escapeHtml(input) {
     };
     return input.replace(/[&<>"'/\\@%]/g, (m) => map[m]);
 }
+
+//http://nas.karel.be:40371/69c4916e-856e-4154-8744-460683d451be.jpeg
