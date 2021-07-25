@@ -47,10 +47,31 @@ app.post('/',async (req,res)=>{
 });
 
 app.get('/:filename',(req,res)=>{
-    console.log(path.resolve(__dirname,'images/',req.params.filename));
-    res.sendFile(path.resolve(__dirname,'images/',req.params.filename));
+    
+    console.log(path.resolve(__dirname,'images/',(escapeHtmlreq.params.filename)));
+    res.sendFile(path.resolve(__dirname,'images/',escapeHtml(req.params.filename)));
 });
 
 app.listen(4000,()=>{
     console.log(`Server running on port 4000`);
 })
+
+
+
+//function that will check escape html encoding 
+function escapeHtml(input) {
+    let map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+        '/': '&#x2F;',
+        '.': '&#x2E;',
+        '`': '&#x60;',
+        '@': '&#x40;',
+        '\\': '&#x5C;',
+        '%': '&#x25;',
+    };
+    return input.replace(/[&<>"']/g, (m) => map[m]);
+}
