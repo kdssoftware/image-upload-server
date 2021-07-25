@@ -1,2 +1,5 @@
 yarn.lock
 node_modules/
+images/*.jpg
+images/*.png
+images/*.jpeg
