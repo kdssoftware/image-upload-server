@@ -67,11 +67,10 @@ function escapeHtml(input) {
         '"': '&quot;',
         "'": '&#039;',
         '/': '&#x2F;',
-        '.': '&#x2E;',
         '`': '&#x60;',
         '@': '&#x40;',
         '\\': '&#x5C;',
         '%': '&#x25;',
     };
-    return input.replace(/[&<>"']/g, (m) => map[m]);
+    return input.replace(/[&<>"'/\\@%]/g, (m) => map[m]);
 }
