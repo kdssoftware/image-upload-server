@@ -10,5 +10,5 @@ docker pull ghcr.io/snakehead007/picturehouse-images:latest
 
 running:
 ```bash
-docker run -e PORT=4000 -e HOST=http://localhost:4000 --name picturehouse-images ghcr.io/snakehead007/picturehouse-images
+docker run -e HOST=http://test.example.com  -p 80:4000 --name picturehouse-images ghcr.io/snakehead007/picturehouse-images
 ```
