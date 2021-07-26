@@ -49,11 +49,15 @@ app.post('/',async (req,res)=>{
         await imageCompressed.writeAsync(imagePathPrivateCompressed);
         await imageBlurred.blur(10);
         await imageBlurred.writeAsync(imagePathPrivateBlur);
+        let width = imageCompressed.getWidth();
+        let height =imageCompressed.getHeight();
 
         urls.push({
             full:imagePathPublicFull,
             compressed:imagePathPublicCompressed,
-            blur:imagePathPublicBlur
+            blur:imagePathPublicBlur,
+            width,
+            height
         });
     }
     res.status(201).send(urls);
