@@ -6,6 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const Jimp = require('jimp');
 
 app.use(cors({origin:'*'}));
 
@@ -32,12 +33,28 @@ app.post('/',async (req,res)=>{
     const blobs = req.files;
     let urls = [];
     for await (const blob of blobs) {
-        const uuid = uuidv4();  
-        const imagePathPrivate = path.resolve(__dirname, "images",uuid+"."+blob.mimetype.split('/')[1]);
-        const imagePathPublic = `${process.env.HOST}/${uuid+"."+blob.mimetype.split('/')[1]}`;
-        fs.writeFileSync(imagePathPrivate, blob.buffer);
-        urls.push(imagePathPublic);
-        console.log(`new file added: ${imagePathPublic}`);
+        const uuidFull = uuidv4();
+        const imagePathPrivateFull = path.resolve(__dirname, "images",uuidFull+"."+blob.mimetype.split('/')[1]);
+        const imagePathPublicFull = `${process.env.HOST}/${uuidFull+"."+blob.mimetype.split('/')[1]}`;
+        const uuidBlur = uuidv4();
+        const imagePathPrivateBlur = path.resolve(__dirname, "images",uuidBlur+"."+blob.mimetype.split('/')[1]);
+        const imagePathPublicBlur = `${process.env.HOST}/${uuidBlur+"."+blob.mimetype.split('/')[1]}`;
+        const uuidCompressed = uuidv4();
+        const imagePathPrivateCompressed = path.resolve(__dirname, "images",uuidCompressed+"."+blob.mimetype.split('/')[1]);
+        const imagePathPublicCompressed = `${process.env.HOST}/${uuidCompressed+"."+blob.mimetype.split('/')[1]}`;
+        await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
+        const imageCompressed = await Jimp.read(imagePathPrivateFull);
+        await imageCompressed.quality(40);
+        const imageBlurred = imageCompressed;
+        await imageCompressed.writeAsync(imagePathPrivateCompressed);
+        await imageBlurred.blur(10);
+        await imageBlurred.writeAsync(imagePathPrivateBlur);
+
+        urls.push({
+            full:imagePathPublicFull,
+            compressed:imagePathPublicCompressed,
+            blur:imagePathPublicBlur
+        });
     }
     res.status(201).send(urls);
     res.end();
@@ -60,6 +77,11 @@ app.get('/:filename',(req,res)=>{
         res.end();
         return
     }
+});
+
+app.get('/',(req,res)=>{
+    res.status(405).send('Method not allowed');
+    res.end();
 });
 
 app.listen(4000,()=>{
