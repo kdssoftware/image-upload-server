@@ -32,17 +32,21 @@ app.post('/',async (req,res)=>{
     await multerAny(req, res);
     const blobs = req.files;
     let urls = [];
+    let uploads = [];
     for await (const blob of blobs) {
         const uuidFull = uuidv4();
         const file = uuidFull+"."+blob.mimetype.split('/')[1];
-        const imagePathPrivateFull = await  path.resolve(__dirname, "images",uuidFull+"."+blob.mimetype.split('/')[1]);
+        const imagePathPrivateFull = path.resolve(__dirname,'images/',uuidFull+"."+blob.mimetype.split('/')[1]);
         console.log(imagePathPrivateFull);
         const imagePathPublicFull = `${process.env.HOST}/${uuidFull+"."+blob.mimetype.split('/')[1]}`;
         await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
-        const image = await Jimp.read(file);
+        const image = await Jimp.read(imagePathPrivateFull);
         let width = image.getWidth();
         let height =image.getHeight();
-
+        uploads.push({
+            path:imagePathPrivateFull,
+            file:file
+        });
         urls.push({
             url:imagePathPublicFull,
             file:uuidFull+"."+blob.mimetype.split('/')[1],
@@ -51,78 +55,75 @@ app.post('/',async (req,res)=>{
         });
     }
     res.status(201).send(urls);
-    return;
+    
+    //after uploading image we need to blur and compress it
+    for await (const upload of uploads) {
+        crop(await Jimp.read(upload.path),path.resolve(__dirname, "images","cropped-"+upload.file));
+        compress(await Jimp.read(upload.path),path.resolve(__dirname, "images","compressed-"+upload.file));
+        blur(await Jimp.read(upload.path),path.resolve(__dirname, "images","blur-"+upload.file));
+        
+    }
 });
 
 app.get('/:filename', async (req,res)=>{
     try{
         let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
-        console.log("finding "+file);
-        //check if file exists
-        if(!fs.existsSync(file)){
-            res.status(404).send('File not found');
-            return;
-        }
-        res.sendFile(file, function (err) {
-            if (err) {
-                console.log(err);
-            }
-        });
-
-    }catch(e){
-        console.trace(e);
-        res.status(500).send("Something went wrong on our end");
-        return
-    }
-});
-
-app.get('/:type/:filename', async (req,res)=>{
-    try{
-        let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
-        //check if file exists
-        if(!fs.existsSync(file)){
-            res.status(404).send('File not found');
-            return;
-        }
-        const uuid = uuidv4();
-        const imagePathPrivate = path.resolve(__dirname, "images",uuid+"."+req.params.filename.split('.')[req.params.filename.split('.').length-1]);
-        const image = await Jimp.read(file);
-        switch(req.params.type){
+        switch(req.params.filename.split('-')[0]) {
+            case 'cropped':
             case 'compressed':
-                await image.quality(30);
-                await image.writeAsync(imagePathPrivate);
-                res.sendFile(imagePathPrivate);
-                console.log("sending file");
-                setTimeout(()=>{
-                    fs.unlinkSync(imagePathPrivate);
-                },5000);
-                break;
             case 'blur':
-                await image.quality(15);
-                await image.blur(10);
-                await image.writeAsync(imagePathPrivate);
-                res.sendFile(imagePathPrivate);
-                console.log("sending file");
-                setTimeout(()=>{
-                    fs.unlinkSync(imagePathPrivate);
-                },5000);
-                break;
-            case "cropped":
-                //crop image to a square
-                let square = Math.min(image.getWidth(),image.getHeight());
-                await image.quality(30);
-                await image.crop(image.getWidth()<=square?0:((image.getWidth()-square)/2) ,image.getHeight()<=square?0:((image.getHeight()-square)/2) , square, square);
-                await image.writeAsync(imagePathPrivate);
-                res.sendFile(imagePathPrivate);
-                console.log("sending file");
-                setTimeout(()=>{
-                    fs.unlinkSync(imagePathPrivate);
-                },5000);
+               let originalFilePath = path.resolve(__dirname,'images/',escapeHtml(getOriginalFile(req.params.filename)));
+                if(!fs.existsSync(file)){
+                    if(!fs.existsSync(originalFilePath)){
+                        res.status(404).send('File not found');
+                        return;
+                    }else{
+                        //create the file
+                        console.log("file not yet created, creating a temp file...");
+                        let tempfile;
+                        let fileExtension = req.params.filename.split('.')[req.params.filename.split('.').length-1];
+                        let tempfilePath = path.resolve(__dirname,'images/',uuidv4()+"."+fileExtension);
+                        let jimpImage = await Jimp.read(originalFilePath);
+                        switch(req.params.filename.split('-')[0]) {
+                            case 'cropped':
+                                tempfile = await crop(jimpImage,path.resolve(__dirname, "images/",tempfilePath));
+                                break;
+                            case 'compressed':
+                                tempfile = await compress(jimpImage,path.resolve(__dir__dirname, "images/",tempfilePath));
+                                break;
+                            case 'blur':
+                                tempfile = await blur(jimpImage,path.resolve(__dirname, "images/",tempfilePath));
+                                break;
+                        }
+                        res.sendFile(tempfilePath, function (err) {
+                            if (err) {
+                                console.log(err);
+                            }
+                        });
+                        //after 30 seconds of sending the file. delete it.
+                        setTimeout(()=>{
+                            fs.unlinkSync(tempfilePath);
+                        },30000);
+                    }
+                }else{
+                    res.sendFile(file, function (err) {
+                        if (err) {
+                            console.log(err);
+                        }
+                    });
+                }
                 break;
             default:
-                res.sendFile(file);
+                if(!fs.existsSync(file)){
+                    res.status(404).send('File not found');
+                    return;
+                }
+                res.sendFile(file, function (err) {
+                    if (err) {
+                        console.log(err);
+                    }
+                });
         }
-        
     }catch(e){
         console.trace(e);
         res.status(500).send("Something went wrong on our end");
@@ -158,3 +159,29 @@ function escapeHtml(input) {
 }
 
 //http://nas.karel.be:40371/69c4916e-856e-4154-8744-460683d451be.jpeg
+
+async function blur(jimpImage, imagePathPrivate){
+    let square = Math.min(jimpImage.getWidth(),jimpImage.getHeight());
+    await jimpImage.crop(jimpImage.getWidth()<=square?0:((jimpImage.getWidth()-square)/2) ,jimpImage.getHeight()<=square?0:((jimpImage.getHeight()-square)/2) , square, square);
+    await jimpImage.quality(20);
+    await jimpImage.blur(50);
+    await jimpImage.writeAsync(imagePathPrivate);
+    return imagePathPrivate;
+}
+async function compress(jimpImage, imagePathPrivate){
+    await jimpImage.quality(30);
+    await jimpImage.writeAsync(imagePathPrivate);
+    return imagePathPrivate;
+}
+async function crop(jimpImage, imagePathPrivate){
+    let square = Math.min(jimpImage.getWidth(),jimpImage.getHeight());
+    await jimpImage.quality(30);
+    await jimpImage.crop(jimpImage.getWidth()<=square?0:((jimpImage.getWidth()-square)/2) ,jimpImage.getHeight()<=square?0:((jimpImage.getHeight()-square)/2) , square, square);
+    await jimpImage.writeAsync(imagePathPrivate);
+    return imagePathPrivate;
+}
+let getOriginalFile = (file) => {
+    let filesplit = file.split('-');
+    filesplit.shift();
+    return filesplit.join('-');
+}
