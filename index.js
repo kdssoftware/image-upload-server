@@ -34,58 +34,104 @@ app.post('/',async (req,res)=>{
     let urls = [];
     for await (const blob of blobs) {
         const uuidFull = uuidv4();
-        const imagePathPrivateFull = path.resolve(__dirname, "images",uuidFull+"."+blob.mimetype.split('/')[1]);
+        const file = uuidFull+"."+blob.mimetype.split('/')[1];
+        const imagePathPrivateFull = await  path.resolve(__dirname, "images",uuidFull+"."+blob.mimetype.split('/')[1]);
+        console.log(imagePathPrivateFull);
         const imagePathPublicFull = `${process.env.HOST}/${uuidFull+"."+blob.mimetype.split('/')[1]}`;
-        const uuidBlur = uuidv4();
-        const imagePathPrivateBlur = path.resolve(__dirname, "images",uuidBlur+"."+blob.mimetype.split('/')[1]);
-        const imagePathPublicBlur = `${process.env.HOST}/${uuidBlur+"."+blob.mimetype.split('/')[1]}`;
-        const uuidCompressed = uuidv4();
-        const imagePathPrivateCompressed = path.resolve(__dirname, "images",uuidCompressed+"."+blob.mimetype.split('/')[1]);
-        const imagePathPublicCompressed = `${process.env.HOST}/${uuidCompressed+"."+blob.mimetype.split('/')[1]}`;
         await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
-        const imageCompressed = await Jimp.read(imagePathPrivateFull);
-        await imageCompressed.quality(40);
-        const imageBlurred = imageCompressed;
-        await imageCompressed.writeAsync(imagePathPrivateCompressed);
-        await imageBlurred.blur(10);
-        await imageBlurred.writeAsync(imagePathPrivateBlur);
-        let width = imageCompressed.getWidth();
-        let height =imageCompressed.getHeight();
+        const image = await Jimp.read(file);
+        let width = image.getWidth();
+        let height =image.getHeight();
 
         urls.push({
-            full:imagePathPublicFull,
-            compressed:imagePathPublicCompressed,
-            blur:imagePathPublicBlur,
+            url:imagePathPublicFull,
+            file:uuidFull+"."+blob.mimetype.split('/')[1],
             width,
             height
         });
     }
     res.status(201).send(urls);
-    res.end();
     return;
 });
 
-app.get('/:filename',(req,res)=>{
+app.get('/:filename', async (req,res)=>{
+    try{
+        let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
+        console.log("finding "+file);
+        //check if file exists
+        if(!fs.existsSync(file)){
+            res.status(404).send('File not found');
+            return;
+        }
+        res.sendFile(file, function (err) {
+            if (err) {
+                console.log(err);
+            }
+        });
+
+    }catch(e){
+        console.trace(e);
+        res.status(500).send("Something went wrong on our end");
+        return
+    }
+});
+
+app.get('/:type/:filename', async (req,res)=>{
     try{
         let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
         //check if file exists
         if(!fs.existsSync(file)){
             res.status(404).send('File not found');
-            res.end();
             return;
         }
-        res.sendFile(path.resolve(__dirname,'images/',escapeHtml(req.params.filename)));
+        const uuid = uuidv4();
+        const imagePathPrivate = path.resolve(__dirname, "images",uuid+"."+req.params.filename.split('.')[req.params.filename.split('.').length-1]);
+        const image = await Jimp.read(file);
+        switch(req.params.type){
+            case 'compressed':
+                await image.quality(30);
+                await image.writeAsync(imagePathPrivate);
+                res.sendFile(imagePathPrivate);
+                console.log("sending file");
+                setTimeout(()=>{
+                    fs.unlinkSync(imagePathPrivate);
+                },5000);
+                break;
+            case 'blur':
+                await image.quality(15);
+                await image.blur(10);
+                await image.writeAsync(imagePathPrivate);
+                res.sendFile(imagePathPrivate);
+                console.log("sending file");
+                setTimeout(()=>{
+                    fs.unlinkSync(imagePathPrivate);
+                },5000);
+                break;
+            case "cropped":
+                //crop image to a square
+                let square = Math.min(image.getWidth(),image.getHeight());
+                await image.quality(30);
+                await image.crop(image.getWidth()<=square?0:((image.getWidth()-square)/2) ,image.getHeight()<=square?0:((image.getHeight()-square)/2) , square, square);
+                await image.writeAsync(imagePathPrivate);
+                res.sendFile(imagePathPrivate);
+                console.log("sending file");
+                setTimeout(()=>{
+                    fs.unlinkSync(imagePathPrivate);
+                },5000);
+                break;
+            default:
+                res.sendFile(file);
+        }
         
     }catch(e){
+        console.trace(e);
         res.status(500).send("Something went wrong on our end");
-        res.end();
         return
     }
 });
 
 app.get('/',(req,res)=>{
     res.status(405).send('Method not allowed');
-    res.end();
 });
 
 app.listen(4000,()=>{
