@@ -53,4 +53,4 @@ docker run -e HOST=http://test.example.com  -p 80:4000 --name picturehouse-image
     Response:
     The picture in Binary
 
-    <i>Info: the altered files will be automatically created when a new file is uploaded, to ensure the best speed. If the file was not created (for example taking longer to alter the file) it will alter the file on-demand as a temporary file (deleted after 30 seconds of sending)</i>
+    <i>Info: the altered files will be automatically created when a new file is uploaded, to ensure the best speed. If the file was not created (for example taking longer to alter the file) it will alter the file on-demand</i>
