@@ -8,8 +8,6 @@ const path = require('path');
 const cors = require('cors');
 const Jimp = require('jimp');
 
-app.use(cors({origin:'*'}));
-
 const upload = multer();
 
 function initMiddleware(middleware) {
@@ -28,6 +26,8 @@ const multerAny = initMiddleware(
   upload.any()
 );
 
+app.options('/', cors({origin:['http://localhost:3000', 'https://picturehouse.be']}))
+
 app.post('/',async (req,res)=>{
     await multerAny(req, res);
     const blobs = req.files;
@@ -37,21 +37,26 @@ app.post('/',async (req,res)=>{
         const uuidFull = uuidv4();
         const file = uuidFull+"."+blob.mimetype.split('/')[1];
         const imagePathPrivateFull = path.resolve(__dirname,'images/',uuidFull+"."+blob.mimetype.split('/')[1]);
-        console.log(imagePathPrivateFull);
         const imagePathPublicFull = `${process.env.HOST}/${uuidFull+"."+blob.mimetype.split('/')[1]}`;
         await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
+        console.log("saved file "+imagePathPrivateFull);
         const image = await Jimp.read(imagePathPrivateFull);
+        console.log(image._exif.tags);
         let width = image.getWidth();
         let height =image.getHeight();
         uploads.push({
             path:imagePathPrivateFull,
             file:file
         });
+        delete blob.buffer;
         urls.push({
             url:imagePathPublicFull,
             file:uuidFull+"."+blob.mimetype.split('/')[1],
             width,
-            height
+            height,
+            ...blob,
+            uploadDate:Date.now(),
+            exif_tags:image._exif.tags
         });
     }
     res.status(201).send(urls);
@@ -75,35 +80,32 @@ app.get('/:filename', async (req,res)=>{
                let originalFilePath = path.resolve(__dirname,'images/',escapeHtml(getOriginalFile(req.params.filename)));
                 if(!fs.existsSync(file)){
                     if(!fs.existsSync(originalFilePath)){
+                        console.log("file "+req.params.filename+" not found");
                         res.status(404).send('File not found');
                         return;
                     }else{
                         //create the file
-                        console.log("file not yet created, creating a temp file...");
                         let tempfile;
                         let fileExtension = req.params.filename.split('.')[req.params.filename.split('.').length-1];
                         let tempfilePath = path.resolve(__dirname,'images/',uuidv4()+"."+fileExtension);
                         let jimpImage = await Jimp.read(originalFilePath);
+                        console.log("file '"+escapeHtml(req.params.filename)+"' not yet created, creating a new one at "+path.resolve(__dirname, "images/",req.params.filename));
                         switch(req.params.filename.split('-')[0]) {
                             case 'cropped':
-                                tempfile = await crop(jimpImage,path.resolve(__dirname, "images/",tempfilePath));
+                                tempfile = await crop(jimpImage,path.resolve(__dirname, "images/",req.params.filename));
                                 break;
                             case 'compressed':
-                                tempfile = await compress(jimpImage,path.resolve(__dir__dirname, "images/",tempfilePath));
+                                tempfile = await compress(jimpImage,path.resolve(__dir__dirname, "images/",req.params.filename));
                                 break;
                             case 'blur':
-                                tempfile = await blur(jimpImage,path.resolve(__dirname, "images/",tempfilePath));
+                                tempfile = await blur(jimpImage,path.resolve(__dirname, "images/",req.params.filename));
                                 break;
                         }
-                        res.sendFile(tempfilePath, function (err) {
+                        res.sendFile(path.resolve(__dirname, "images/",req.params.filename), function (err) {
                             if (err) {
                                 console.log(err);
                             }
                         });
-                        //after 30 seconds of sending the file. delete it.
-                        setTimeout(()=>{
-                            fs.unlinkSync(tempfilePath);
-                        },30000);
                     }
                 }else{
                     res.sendFile(file, function (err) {
@@ -135,8 +137,8 @@ app.get('/',(req,res)=>{
     res.status(405).send('Method not allowed');
 });
 
-app.listen(4000,()=>{
-    console.log(`Server running on port 4000`);
+app.listen(process.env.PORT,()=>{
+    console.log(`Server ${process.env.HOST} running on port ${process.env.PORT}`);
 })
 
 
@@ -166,11 +168,13 @@ async function blur(jimpImage, imagePathPrivate){
     await jimpImage.quality(20);
     await jimpImage.blur(50);
     await jimpImage.writeAsync(imagePathPrivate);
+    console.log(`created blur image from ${imagePathPrivate}`);
     return imagePathPrivate;
 }
 async function compress(jimpImage, imagePathPrivate){
     await jimpImage.quality(30);
     await jimpImage.writeAsync(imagePathPrivate);
+    console.log(`created compress image from ${imagePathPrivate}`);
     return imagePathPrivate;
 }
 async function crop(jimpImage, imagePathPrivate){
@@ -178,6 +182,7 @@ async function crop(jimpImage, imagePathPrivate){
     await jimpImage.quality(30);
     await jimpImage.crop(jimpImage.getWidth()<=square?0:((jimpImage.getWidth()-square)/2) ,jimpImage.getHeight()<=square?0:((jimpImage.getHeight()-square)/2) , square, square);
     await jimpImage.writeAsync(imagePathPrivate);
+    console.log(`created crop image from ${imagePathPrivate}`);
     return imagePathPrivate;
 }
 let getOriginalFile = (file) => {
