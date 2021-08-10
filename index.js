@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const Jimp = require('jimp');
-
+const jo = require('jpeg-autorotate');
 const upload = multer();
 
 function initMiddleware(middleware) {
@@ -25,10 +25,11 @@ function initMiddleware(middleware) {
 const multerAny = initMiddleware(
   upload.any()
 );
-
-app.options('/', cors({origin:['http://localhost:3000', 'https://picturehouse.be']}))
+app.options('*', cors())
 
 app.post('/',async (req,res)=>{
+    res.header("Access-Control-Allow-Origin", "https://www.picturehouse.be");
+    // res.header("Access-Control-Allow-Origin", "http://localhost:3000");
     await multerAny(req, res);
     const blobs = req.files;
     let urls = [];
@@ -41,7 +42,6 @@ app.post('/',async (req,res)=>{
         await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
         console.log("saved file "+imagePathPrivateFull);
         const image = await Jimp.read(imagePathPrivateFull);
-        console.log(image._exif.tags);
         let width = image.getWidth();
         let height =image.getHeight();
         uploads.push({
@@ -49,6 +49,8 @@ app.post('/',async (req,res)=>{
             file:file
         });
         delete blob.buffer;
+        delete image._exif.tags["undefined"];
+        console.log(image._exif.tags.Orientation);
         urls.push({
             url:imagePathPublicFull,
             file:uuidFull+"."+blob.mimetype.split('/')[1],
@@ -71,12 +73,14 @@ app.post('/',async (req,res)=>{
 });
 
 app.get('/:filename', async (req,res)=>{
+    res.header("Access-Control-Allow-Origin", "https://www.picturehouse.be");
+    // res.header("Access-Control-Allow-Origin", "http://localhost:3000");
     try{
         let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
         switch(req.params.filename.split('-')[0]) {
             case 'cropped':
             case 'compressed':
-            case 'blur':
+            // case 'blur':
                let originalFilePath = path.resolve(__dirname,'images/',escapeHtml(getOriginalFile(req.params.filename)));
                 if(!fs.existsSync(file)){
                     if(!fs.existsSync(originalFilePath)){
@@ -95,7 +99,7 @@ app.get('/:filename', async (req,res)=>{
                                 tempfile = await crop(jimpImage,path.resolve(__dirname, "images/",req.params.filename));
                                 break;
                             case 'compressed':
-                                tempfile = await compress(jimpImage,path.resolve(__dir__dirname, "images/",req.params.filename));
+                                tempfile = await compress(jimpImage,path.resolve(__dirname, "images/",req.params.filename));
                                 break;
                             case 'blur':
                                 tempfile = await blur(jimpImage,path.resolve(__dirname, "images/",req.params.filename));
@@ -141,8 +145,6 @@ app.listen(process.env.PORT,()=>{
     console.log(`Server ${process.env.HOST} running on port ${process.env.PORT}`);
 })
 
-
-
 //function that will check escape html encoding 
 function escapeHtml(input) {
     let map = {
@@ -160,33 +162,63 @@ function escapeHtml(input) {
     return input.replace(/[&<>"'/\\@%]/g, (m) => map[m]);
 }
 
-//http://nas.karel.be:40371/69c4916e-856e-4154-8744-460683d451be.jpeg
-
 async function blur(jimpImage, imagePathPrivate){
     let square = Math.min(jimpImage.getWidth(),jimpImage.getHeight());
     await jimpImage.crop(jimpImage.getWidth()<=square?0:((jimpImage.getWidth()-square)/2) ,jimpImage.getHeight()<=square?0:((jimpImage.getHeight()-square)/2) , square, square);
     await jimpImage.quality(20);
     await jimpImage.blur(50);
+    autoRotate(jimpImage,imagePathPrivate);
     await jimpImage.writeAsync(imagePathPrivate);
     console.log(`created blur image from ${imagePathPrivate}`);
     return imagePathPrivate;
 }
+
 async function compress(jimpImage, imagePathPrivate){
-    await jimpImage.quality(30);
+    await jimpImage.quality(40);
+    await autoRotate(jimpImage);
     await jimpImage.writeAsync(imagePathPrivate);
     console.log(`created compress image from ${imagePathPrivate}`);
     return imagePathPrivate;
 }
+
 async function crop(jimpImage, imagePathPrivate){
     let square = Math.min(jimpImage.getWidth(),jimpImage.getHeight());
-    await jimpImage.quality(30);
+    await jimpImage.quality(40);
     await jimpImage.crop(jimpImage.getWidth()<=square?0:((jimpImage.getWidth()-square)/2) ,jimpImage.getHeight()<=square?0:((jimpImage.getHeight()-square)/2) , square, square);
+    await autoRotate(jimpImage);
     await jimpImage.writeAsync(imagePathPrivate);
     console.log(`created crop image from ${imagePathPrivate}`);
     return imagePathPrivate;
 }
+
 let getOriginalFile = (file) => {
     let filesplit = file.split('-');
     filesplit.shift();
     return filesplit.join('-');
+}
+
+let autoRotate = async (JimpImage) =>{
+    switch(JimpImage._exif.tags.Orientation){
+        case 2:
+            await JimpImage.flip(true,false);
+            break;
+        case 3:
+            await JimpImage.rotate(180);
+            break;
+        case 4:
+            await JimpImage.rotate(180).flip(true,false);
+            break;
+        case 5:
+            await JimpImage.rotate(-90).flip(true,false);
+            break;
+        case 6:
+            await JimpImage.rotate(90);
+            break;
+        case 7:
+            await JimpImage.rotate(-90).flip(true,false);
+            break;
+        case 8:
+            await JimpImage.rotate(-90);
+            break;
+    }
 }
