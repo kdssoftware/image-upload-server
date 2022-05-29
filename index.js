@@ -10,6 +10,8 @@ const Jimp = require('jimp');
 const jo = require('jpeg-autorotate');
 const upload = multer();
 
+const HOST = process.env.HOST
+
 function initMiddleware(middleware) {
     return (req, res) =>
       new Promise((resolve, reject) => {
@@ -25,56 +27,66 @@ function initMiddleware(middleware) {
 const multerAny = initMiddleware(
   upload.any()
 );
+
+app.get('/healtz',(req,res)=>{
+    console.log("GET /healthz")
+    console.log("wow")
+    res.send("OK")
+})
+
 app.options('*', cors())
 
 app.post('/',async (req,res)=>{
-    res.header("Access-Control-Allow-Origin", "https://www.picturehouse.be");
-    // res.header("Access-Control-Allow-Origin", "http://localhost:3000");
+    console.log("POST / ",req.body)
+    res.header("Access-Control-Allow-Origin", HOST);
     await multerAny(req, res);
-    const blobs = req.files;
-    let urls = [];
-    let uploads = [];
-    for await (const blob of blobs) {
-        const uuidFull = uuidv4();
-        const file = uuidFull+"."+blob.mimetype.split('/')[1];
-        const imagePathPrivateFull = path.resolve(__dirname,'images/',uuidFull+"."+blob.mimetype.split('/')[1]);
-        const imagePathPublicFull = `${process.env.HOST}/${uuidFull+"."+blob.mimetype.split('/')[1]}`;
-        await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
-        console.log("saved file "+imagePathPrivateFull);
-        const image = await Jimp.read(imagePathPrivateFull);
-        let width = image.getWidth();
-        let height =image.getHeight();
-        uploads.push({
-            path:imagePathPrivateFull,
-            file:file
-        });
-        delete blob.buffer;
-        delete image._exif.tags["undefined"];
-        console.log(image._exif.tags.Orientation);
-        urls.push({
-            url:imagePathPublicFull,
-            file:uuidFull+"."+blob.mimetype.split('/')[1],
-            width,
-            height,
-            ...blob,
-            uploadDate:Date.now(),
-            exif_tags:image._exif.tags
-        });
-    }
-    res.status(201).send(urls);
-    
-    //after uploading image we need to blur and compress it
-    for await (const upload of uploads) {
-        crop(await Jimp.read(upload.path),path.resolve(__dirname, "images","cropped-"+upload.file));
-        compress(await Jimp.read(upload.path),path.resolve(__dirname, "images","compressed-"+upload.file));
-        blur(await Jimp.read(upload.path),path.resolve(__dirname, "images","blur-"+upload.file));
+    if(req.files){
+        const blobs = req.files;
+        let urls = [];
+        let uploads = [];
+        for await (const blob of blobs) {
+            const uuidFull = uuidv4();
+            const file = uuidFull+"."+blob.mimetype.split('/')[1];
+            const imagePathPrivateFull = path.resolve(__dirname,'images/',uuidFull+"."+blob.mimetype.split('/')[1]);
+            const imagePathPublicFull = `${HOST}/${uuidFull+"."+blob.mimetype.split('/')[1]}`;
+            await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
+            console.log("saved file "+imagePathPrivateFull);
+            const image = await Jimp.read(imagePathPrivateFull);
+            let width = image.getWidth();
+            let height =image.getHeight();
+            uploads.push({
+                path:imagePathPrivateFull,
+                file:file
+            });
+            delete blob.buffer;
+            delete image._exif.tags["undefined"];
+            console.log(image._exif.tags.Orientation);
+            urls.push({
+                url:imagePathPublicFull,
+                file:uuidFull+"."+blob.mimetype.split('/')[1],
+                width,
+                height,
+                ...blob,
+                uploadDate:Date.now(),
+                exif_tags:image._exif.tags
+            });
+        }
+        res.status(201).send(urls);
         
+        //after uploading image we need to blur and compress it
+        for await (const upload of uploads) {
+            crop(await Jimp.read(upload.path),path.resolve(__dirname, "images","cropped-"+upload.file));
+            compress(await Jimp.read(upload.path),path.resolve(__dirname, "images","compressed-"+upload.file));
+            blur(await Jimp.read(upload.path),path.resolve(__dirname, "images","blur-"+upload.file)); 
+     }
+    }else{
+        es.status(201).send("No files got. put in body as 'files[]'");
     }
 });
 
 app.get('/:filename', async (req,res)=>{
-    res.header("Access-Control-Allow-Origin", "https://www.picturehouse.be");
-    // res.header("Access-Control-Allow-Origin", "http://localhost:3000");
+    console.log("GET /"+req.params.filename+" ",req.query)
+    res.header("Access-Control-Allow-Origin", HOST);
     try{
         let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
         switch(req.params.filename.split('-')[0]) {
@@ -138,11 +150,12 @@ app.get('/:filename', async (req,res)=>{
 });
 
 app.get('/',(req,res)=>{
+    console.log("GET / ",req.query)
     res.status(405).send('Method not allowed');
 });
 
-app.listen(process.env.PORT,()=>{
-    console.log(`Server ${process.env.HOST} running on port ${process.env.PORT}`);
+app.listen(8181,()=>{
+    console.log(`server listening on port 8181`);
 })
 
 //function that will check escape html encoding 

@@ -15,6 +15,9 @@
   },
   "scripts": {
     "start": "node index.js",
-    "windocker": "docker build -t ghcr.io/snakehead007/picturehouse-images . && docker push ghcr.io/snakehead007/picturehouse-images"
+    "docker": "docker build --platform linux/amd64 -t ghcr.io/kdssoftware/image-upload-server:latest . && docker run -e HOST=http://localhost:4000 -p 4000:8181  --rm --platform linux/amd64 ghcr.io/kdssoftware/image-upload-server"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.16"
   }
 }
