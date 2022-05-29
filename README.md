@@ -1,16 +1,16 @@
-# File Upload server
-small dynamic file server for images used in picturehouse.be (https://github.com/snakehead007/picturehouse)
+# Image Upload server
+small dynamic file server for images _(used in picturehouse.be (https://github.com/snakehead007/picturehouse))_
 
 ### Docker usage
 
 Pulling:
 ```bash
-docker pull ghcr.io/snakehead007/picturehouse-images:latest
+docker pull ghcr.io/snakehead007/image-upload-server:latest
 ```
 
 running:
 ```bash
-docker run -e HOST=http://test.example.com  -p 80:4000 --name picturehouse-images ghcr.io/snakehead007/picturehouse-images
+docker run -e HOST=http://test.example.com  -p 80:4000 --name image-upload-server ghcr.io/snakehead007/image-upload-server
 ```
 
 ## API endpoints
