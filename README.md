@@ -18,7 +18,7 @@ docker run -e HOST=http://localhost:4000 -p 4000:8181 --name image-upload-server
 - `POST / `
     Add new pictures to the server
     
-    <i>Where 'files' in the body are sent (in Binary).</i>
+    <i>Where 'files[]' in the body are sent (in Binary).</i>
     
     Response: 
     ```json
