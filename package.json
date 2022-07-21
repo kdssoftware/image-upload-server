@@ -15,7 +15,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "docker": "docker build --platform linux/amd64 -t ghcr.io/kdssoftware/image-upload-server:latest . && docker run -e HOST=http://localhost:4000 -p 4000:8181  --rm --platform linux/amd64 ghcr.io/kdssoftware/image-upload-server"
+    "docker": "docker build --platform linux/amd64 -t ghcr.io/kdssoftware/image-upload-server:latest . && docker run -e CORS=http://localhost:3000  -e HOST=http://localhost:4000 -p 4000:8181  --rm --platform linux/amd64 ghcr.io/kdssoftware/image-upload-server"
   },
   "devDependencies": {
     "nodemon": "^2.0.16"

@@ -10,7 +10,7 @@ docker pull ghcr.io/kdssoftware/image-upload-server:latest
 
 running:
 ```bash
-docker run -e HOST=http://localhost:4000 -p 4000:8181 --name image-upload-server ghcr.io/kdssoftware/image-upload-server
+docker run -e HOST=http://localhost:4000  -e CORS=http://localhost:3000 -p 4000:8181 --name image-upload-server ghcr.io/kdssoftware/image-upload-server
 ```
 
 ## API endpoints

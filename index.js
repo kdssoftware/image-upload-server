@@ -37,8 +37,8 @@ app.get('/healtz',(req,res)=>{
 app.options('*', cors())
 
 app.post('/',async (req,res)=>{
-    console.log("POST / ",req.body)
-    res.header("Access-Control-Allow-Origin", HOST);
+    console.log("POST / ")
+    res.header("Access-Control-Allow-Origin", process.env.CORS || HOST);
     await multerAny(req, res);
     if(req.files){
         const blobs = req.files;
@@ -47,20 +47,22 @@ app.post('/',async (req,res)=>{
         for await (const blob of blobs) {
             const uuidFull = uuidv4();
             const file = uuidFull+"."+blob.mimetype.split('/')[1];
-            const imagePathPrivateFull = path.resolve(__dirname,'images/',uuidFull+"."+blob.mimetype.split('/')[1]);
+            const imagePathPrivateFull = path.resolve(__dirname,'images/',"save-"+uuidFull+"."+blob.mimetype.split('/')[1]);
             const imagePathPublicFull = `${HOST}/${uuidFull+"."+blob.mimetype.split('/')[1]}`;
             await fs.writeFileSync(imagePathPrivateFull, blob.buffer);
-            console.log("saved file "+imagePathPrivateFull);
             const image = await Jimp.read(imagePathPrivateFull);
+            
             let width = image.getWidth();
             let height =image.getHeight();
-            uploads.push({
-                path:imagePathPrivateFull,
-                file:file
-            });
-            delete blob.buffer;
-            delete image._exif.tags["undefined"];
-            console.log(image._exif.tags.Orientation);
+            await compress(await Jimp.read(imagePathPrivateFull),path.resolve(__dirname, "images",file));
+            await fs.unlinkSync(imagePathPrivateFull)
+            if(blob && blob.buffer){
+                delete blob.buffer;
+            }
+            if(image?._exif?.tags && image?._exif?.tags["undefined"] ){
+                delete image._exif.tags["undefined"];
+            }
+            
             urls.push({
                 url:imagePathPublicFull,
                 file:uuidFull+"."+blob.mimetype.split('/')[1],
@@ -68,17 +70,16 @@ app.post('/',async (req,res)=>{
                 height,
                 ...blob,
                 uploadDate:Date.now(),
-                exif_tags:image._exif.tags
+                exif_tags:image._exif?.tags
             });
         }
         res.status(201).send(urls);
         
-        //after uploading image we need to blur and compress it
-        for await (const upload of uploads) {
-            crop(await Jimp.read(upload.path),path.resolve(__dirname, "images","cropped-"+upload.file));
-            compress(await Jimp.read(upload.path),path.resolve(__dirname, "images","compressed-"+upload.file));
-            blur(await Jimp.read(upload.path),path.resolve(__dirname, "images","blur-"+upload.file)); 
-     }
+    //  after uploading image we need to blur and compress it
+    //  for await (const upload of uploads) {
+    //         crop(await Jimp.read(upload.path),path.resolve(__dirname, "images","cropped-"+upload.file));
+    //         blur(await Jimp.read(upload.path),path.resolve(__dirname, "images","blur-"+upload.file)); 
+    //  }
     }else{
         es.status(201).send("No files got. put in body as 'files[]'");
     }
@@ -86,7 +87,7 @@ app.post('/',async (req,res)=>{
 
 app.get('/:filename', async (req,res)=>{
     console.log("GET /"+req.params.filename+" ",req.query)
-    res.header("Access-Control-Allow-Origin", HOST);
+    res.header("Access-Control-Allow-Origin", process.env.CORS || HOST);
     try{
         let file = path.resolve(__dirname,'images/',escapeHtml(req.params.filename));
         switch(req.params.filename.split('-')[0]) {
@@ -113,6 +114,7 @@ app.get('/:filename', async (req,res)=>{
                             case 'compressed':
                                 tempfile = await compress(jimpImage,path.resolve(__dirname, "images/",req.params.filename));
                                 break;
+                            case 'blurred':
                             case 'blur':
                                 tempfile = await blur(jimpImage,path.resolve(__dirname, "images/",req.params.filename));
                                 break;
@@ -211,7 +213,7 @@ let getOriginalFile = (file) => {
 }
 
 let autoRotate = async (JimpImage) =>{
-    switch(JimpImage._exif.tags.Orientation){
+    switch(JimpImage?._exif?.tags?.Orientation){
         case 2:
             await JimpImage.flip(true,false);
             break;
@@ -232,6 +234,8 @@ let autoRotate = async (JimpImage) =>{
             break;
         case 8:
             await JimpImage.rotate(-90);
+            break;
+        default:
             break;
     }
 }
